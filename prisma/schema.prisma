@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model List {
+  id         String    @id @default(cuid())
+  publicSlug String    @unique
+  adminToken String    @unique
+  title      String
+  eventDate  DateTime?
+  note       String?
+  archived   Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  items Item[]
+
+  @@index([archived, eventDate])
+}
+
+enum ItemStatus {
+  AVAILABLE
+  CLAIMED
+}
+
+enum Priority {
+  NICE_TO_HAVE
+  WOULD_LOVE_IT
+}
+
+model Item {
+  id         String     @id @default(cuid())
+  listId     String
+  list       List       @relation(fields: [listId], references: [id], onDelete: Cascade)
+  title      String
+  url        String?
+  imageUrl   String?
+  siteName   String?
+  priceCents Int?
+  currency   String?
+  note       String?
+  priority   Priority?
+  position   Int        @default(0)
+  status     ItemStatus @default(AVAILABLE)
+  createdAt  DateTime   @default(now())
+
+  claim Claim?
+
+  @@index([listId, position])
+}
+
+/// One row per claimed item. The unique constraint on itemId IS the lock:
+/// two simultaneous claims mean one INSERT wins and the other gets P2002.
+model Claim {
+  id          String   @id @default(cuid())
+  itemId      String   @unique
+  item        Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  claimerName String
+  claimCode   String
+  giverId     String
+  createdAt   DateTime @default(now())
+
+  @@index([giverId])
+}
